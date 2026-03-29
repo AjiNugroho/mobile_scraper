@@ -1,0 +1,20 @@
+adbutils==2.12.0
+certifi==2026.1.4
+charset-normalizer==3.4.4
+decorator==5.2.1
+deprecation==2.1.0
+idna==3.11
+lxml==6.0.2
+packaging==26.0
+pillow==12.1.1
+requests==2.32.5
+retry2==0.9.5
+uiautomator2==3.5.0
+urllib3==2.6.3
+# ── Task queue ────────────────────────────────────────────────────────────────
+celery==5.3.4
+# ── Database ──────────────────────────────────────────────────────────────────
+sqlalchemy==2.0.36
+psycopg2-binary==2.9.10
+# ── Device locking ────────────────────────────────────────────────────────────
+filelock==3.16.1
