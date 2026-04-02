@@ -13,8 +13,9 @@ uiautomator2==3.5.0
 urllib3==2.6.3
 # ── Task queue ────────────────────────────────────────────────────────────────
 celery==5.3.4
-# ── Database ──────────────────────────────────────────────────────────────────
+# ── Database (Neon serverless PostgreSQL) ────────────────────────────────────
 sqlalchemy==2.0.36
 psycopg2-binary==2.9.10
+# psycopg2-binary ships its own libpq — no system libs needed inside Docker
 # ── Device locking ────────────────────────────────────────────────────────────
 filelock==3.16.1

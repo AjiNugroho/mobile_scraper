@@ -24,7 +24,6 @@ short delay (without counting against the retry limit).
 
 import logging
 import sys
-from datetime import date, timezone
 
 from celery import Celery
 from celery.exceptions import Ignore
@@ -114,8 +113,6 @@ def scrape_hashtag(self, hashtag: str) -> None:
         raise self.retry(countdown=10, max_retries=None)
 
     # ── 2. Lock the device and run the scrape ─────────────────────────────────
-    run_date = date.today()
-
     try:
         with acquire_device(serial):
             video_ids = run_scrape(serial, hashtag)
@@ -139,10 +136,10 @@ def scrape_hashtag(self, hashtag: str) -> None:
 
     # ── 3. Persist results ────────────────────────────────────────────────────
     if video_ids:
-        inserted = models.save_video_ids(hashtag, run_date, video_ids)
+        inserted = models.save_video_ids(hashtag, video_ids)
         logger.info(
-            "Persisted %d new video IDs for hashtag=%r (run_date=%s)",
-            inserted, hashtag, run_date,
+            "Persisted %d new video IDs for hashtag=%r",
+            inserted, hashtag,
         )
     else:
         logger.warning("No video IDs collected for hashtag=%r", hashtag)

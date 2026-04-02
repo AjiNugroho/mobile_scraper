@@ -5,15 +5,15 @@ Schema
 ------
 scraped_videos
   hashtag   TEXT        — the searched hashtag (e.g. "#wardah")
-  run_date  DATE        — UTC date the scrape ran
   video_id  TEXT        — TikTok video ID extracted from the share URL
-  PRIMARY KEY (hashtag, run_date, video_id)
+  PRIMARY KEY (hashtag, video_id)
+
+Database: Neon (serverless PostgreSQL)
 """
 
 import logging
-from datetime import date
 
-from sqlalchemy import Column, Date, String, create_engine
+from sqlalchemy import Column, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 import config
@@ -31,11 +31,10 @@ class ScrapedVideo(Base):
     __tablename__ = "scraped_videos"
 
     hashtag  = Column(String, primary_key=True, nullable=False)
-    run_date = Column(Date,   primary_key=True, nullable=False)
     video_id = Column(String, primary_key=True, nullable=False)
 
     def __repr__(self) -> str:
-        return f"<ScrapedVideo hashtag={self.hashtag!r} run_date={self.run_date} video_id={self.video_id!r}>"
+        return f"<ScrapedVideo hashtag={self.hashtag!r} video_id={self.video_id!r}>"
 
 
 # ── Engine / session factory ──────────────────────────────────────────────────
@@ -43,6 +42,7 @@ class ScrapedVideo(Base):
 _engine = create_engine(
     config.DATABASE_URL,
     pool_pre_ping=True,   # detect stale connections
+    # Neon requires SSL; the connection string already carries ?sslmode=require
     echo=False,
 )
 
@@ -61,9 +61,9 @@ def init_db() -> None:
 
 # ── Repository helper ─────────────────────────────────────────────────────────
 
-def save_video_ids(hashtag: str, run_date: date, video_ids: list[str]) -> int:
+def save_video_ids(hashtag: str, video_ids: list[str]) -> int:
     """
-    Persist a batch of video IDs for a given hashtag + run_date.
+    Persist a batch of video IDs for a given hashtag.
 
     Duplicate rows (same composite PK) are silently skipped via
     INSERT … ON CONFLICT DO NOTHING so the function is idempotent.
@@ -76,7 +76,7 @@ def save_video_ids(hashtag: str, run_date: date, video_ids: list[str]) -> int:
     from sqlalchemy.dialects.postgresql import insert as pg_insert
 
     rows = [
-        {"hashtag": hashtag, "run_date": run_date, "video_id": vid}
+        {"hashtag": hashtag, "video_id": vid}
         for vid in video_ids
     ]
 
@@ -86,7 +86,7 @@ def save_video_ids(hashtag: str, run_date: date, video_ids: list[str]) -> int:
         session.commit()
         inserted = result.rowcount
         logger.info(
-            "Saved %d new video IDs for hashtag=%r run_date=%s",
-            inserted, hashtag, run_date,
+            "Saved %d new video IDs for hashtag=%r",
+            inserted, hashtag,
         )
         return inserted
