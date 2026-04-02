@@ -81,18 +81,43 @@ EOF
 
 ## Running the worker
 
-### Detect connected devices first
+### Option A — Docker Compose (recommended)
 
 ```bash
-python worker.py
-# Prints: Connected devices: ['emulator-5554', 'R3CN90XXXXX']
+# 1. Fill in your credentials
+cp .env.example .env
+# edit .env: set CLOUDAMQP_URL, DATABASE_URL, CELERY_CONCURRENCY
+
+# 2. Make sure your Android device(s) are connected and authorised on the HOST
+adb devices
+
+# 3. Build and start
+docker compose up --build
+
+# Scale to N devices (each container = one worker process)
+docker compose up --build --scale worker=3
+
+# View logs
+docker compose logs -f worker
+
+# Stop
+docker compose down
 ```
 
-### Start the worker
+> **ADB note:** The compose file mounts the host ADB socket so the container
+> reuses the already-authorised host ADB server.  Run `adb start-server` on
+> the host before starting the container.
 
-Set `--concurrency` to the number of connected devices:
+### Option B — Local (no Docker)
 
 ```bash
+export $(cat .env | xargs)
+
+# Detect connected devices
+python worker.py
+# Prints: Connected devices: ['emulator-5554', 'R3CN90XXXXX']
+
+# Start the worker — set --concurrency to number of devices
 celery -A worker worker --loglevel=info --concurrency=2
 ```
 
@@ -132,13 +157,23 @@ celery -A worker call scrape_hashtag --kwargs='{"hashtag": "#wardah"}'
 ```sql
 CREATE TABLE scraped_videos (
     hashtag  TEXT NOT NULL,
-    run_date DATE NOT NULL,
     video_id TEXT NOT NULL,
-    PRIMARY KEY (hashtag, run_date, video_id)
+    PRIMARY KEY (hashtag, video_id)
 );
 ```
 
 `models.init_db()` creates this table automatically via SQLAlchemy.
+
+### Neon DB setup
+
+1. Create a free project at [neon.tech](https://neon.tech).
+2. Go to **Connection Details** and copy the **Connection string**.
+3. Append `?sslmode=require` if not already present.
+4. Paste it as `DATABASE_URL` in your `.env`:
+
+```
+DATABASE_URL=postgresql+psycopg2://user:password@ep-xxx-yyy.us-east-2.aws.neon.tech/neondb?sslmode=require
+```
 
 ---
 

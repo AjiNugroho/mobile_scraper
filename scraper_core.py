@@ -23,6 +23,13 @@ logger = logging.getLogger(__name__)
 
 def safe_click(d: u2.Device, timeout: int = 5, **kwargs) -> bool:
     """Click a UI element if it exists within *timeout* seconds."""
+    
+    # Convert resourceId prefix to a regex match automatically
+    if "resourceId" in kwargs:
+        resource_id = kwargs.pop("resourceId")
+        stable_prefix = resource_id[:-3]  # drop last 3 chars
+        kwargs["resourceIdMatches"] = re.escape(stable_prefix) + ".{3}"
+    
     el = d(**kwargs)
     if el.exists(timeout=timeout):
         el.click()
@@ -92,27 +99,32 @@ def goto_videos_tab(d: u2.Device) -> None:
     time.sleep(2)
 
 
-def apply_latest_filter(d: u2.Device) -> None:
-    """Apply the 'Past 24 hours' date filter."""
-    logger.debug("Applying latest filter …")
+def apply_latest_filter(d):
+    """applying to the latest filters"""
+    print("🗂️ Applying filter...")
+
     if not safe_click(d, description="More"):
         return
+
     if not safe_click(d, descriptionContains="Filter"):
         return
+
     if not safe_click(
         d,
         resourceId="com.ss.android.ugc.trill:id/eeq",
-        text="Date posted",
+        text="Date posted"
     ):
         return
+    
     if not safe_click(
         d,
         resourceId="com.ss.android.ugc.trill:id/eeq",
-        text="Past 24 hours",
+        text="Past 24 hours"
     ):
         return
+
     safe_click(d, description="Apply")
-    logger.debug("Filter applied.")
+    print("✅ Done.")
 
 
 # ── Video link extraction ─────────────────────────────────────────────────────
