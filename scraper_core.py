@@ -76,6 +76,7 @@ def open_search(d: u2.Device) -> None:
 def type_keyword(d: u2.Device, keyword: str) -> None:
     """Type *keyword* into the search field and submit."""
     logger.debug("Typing keyword: %r", keyword)
+    formatted_keyword=f"#{keyword.lstrip('#')}"
     input_selectors = [
         {"resourceId": f"{config.TIKTOK_PKG}:id/et_search_kw"},
         {"focused": True},
@@ -84,7 +85,7 @@ def type_keyword(d: u2.Device, keyword: str) -> None:
     for sel in input_selectors:
         el = d(**sel)
         if el.exists(timeout=2):
-            el.set_text(keyword)
+            el.set_text(formatted_keyword)
             time.sleep(1)
             d.press("enter")
             time.sleep(3)
@@ -153,28 +154,28 @@ def _extract_video_id_from_url(url: str) -> str | None:
     return match.group(1) if match else None
 
 
-def collect_video_ids(d: u2.Device) -> list[str]:
+def collect_video_urls(d: u2.Device) -> list[str]:
     """
     Open each video in the search result grid, copy its share link,
-    resolve it, and extract the video ID.
+    resolve it, and extract the video URL.
 
-    Returns a deduplicated list of video IDs in discovery order.
+    Returns a deduplicated list of video URLs in discovery order.
     """
-    video_ids: list[str] = []
+    video_urls: list[str] = []
     seen: set[str] = set()
     last_link = ""
 
     grid = d(className="android.widget.GridView")
     if not grid.exists:
         logger.error("GridView not found — cannot collect videos.")
-        return video_ids
+        return video_urls
 
     grid.child(index=0).click()
     time.sleep(2)
 
     while True:
         try:
-            logger.debug("Collecting video %d …", len(video_ids) + 1)
+            logger.debug("Collecting video %d …", len(video_urls) + 1)
             safe_click(d, descriptionContains="Share")
             time.sleep(1)
             safe_click(d, description="Copy link")
@@ -184,15 +185,15 @@ def collect_video_ids(d: u2.Device) -> list[str]:
 
             # Detect end-of-feed: same link twice in a row
             if expanded == last_link:
-                logger.info("Reached end of feed after %d videos.", len(video_ids))
+                logger.info("Reached end of feed after %d videos.", len(video_urls))
                 break
             last_link = expanded
 
-            vid_id = _extract_video_id_from_url(expanded)
-            if vid_id and vid_id not in seen:
-                seen.add(vid_id)
-                video_ids.append(vid_id)
-                logger.info("Collected video ID: %s", vid_id)
+            # vid_id = _extract_video_id_from_url(expanded)
+            if expanded not in seen:
+                seen.add(expanded)
+                video_urls.append(expanded)
+                logger.info("Collected video URL: %s", expanded)
 
         except Exception as exc:
             logger.warning("Error during share flow: %s", exc)
@@ -201,7 +202,7 @@ def collect_video_ids(d: u2.Device) -> list[str]:
         d.swipe(0.5, 0.8, 0.5, 0.2, duration=0.3)
         time.sleep(config.SCROLL_DELAY)
 
-    return video_ids
+    return video_urls
 
 
 # ── Top-level scrape entry point ──────────────────────────────────────────────
@@ -229,6 +230,6 @@ def run_scrape(serial: str, hashtag: str) -> list[str]:
     apply_latest_filter(d)
     time.sleep(2)
 
-    video_ids = collect_video_ids(d)
-    logger.info("[%s] Scrape complete — %d video IDs collected.", serial, len(video_ids))
-    return video_ids
+    video_urls = collect_video_urls(d)
+    logger.info("[%s] Scrape complete — %d video URLs collected.", serial, len(video_urls))
+    return video_urls

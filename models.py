@@ -12,8 +12,10 @@ Database: Neon (serverless PostgreSQL)
 """
 
 import logging
-
-from sqlalchemy import Column, String, create_engine
+from sqlalchemy.orm import declarative_base
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
+from sqlalchemy import Column, String, create_engine,Text, DateTime, func
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 import config
@@ -27,15 +29,17 @@ class Base(DeclarativeBase):
     pass
 
 
-class ScrapedVideo(Base):
-    __tablename__ = "scraped_videos"
+class TiktokHashTagListingVideo(Base):
+    __tablename__ = "tiktok_hashtag_listing_videos"
 
-    hashtag  = Column(String, primary_key=True, nullable=False)
-    video_id = Column(String, primary_key=True, nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_id = Column(Text, nullable=False)
+    hashtag = Column(Text, nullable=False)
+    video_url = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    def __repr__(self) -> str:
-        return f"<ScrapedVideo hashtag={self.hashtag!r} video_id={self.video_id!r}>"
-
+    def __repr__(self):
+        return f"<TiktokHashTagListingVideo(id={self.id}, hashtag={self.hashtag}, video_url={self.video_url})>"
 
 # ── Engine / session factory ──────────────────────────────────────────────────
 
@@ -61,7 +65,7 @@ def init_db() -> None:
 
 # ── Repository helper ─────────────────────────────────────────────────────────
 
-def save_video_ids(hashtag: str, video_ids: list[str]) -> int:
+def save_video_ids(hashtag: str, url_strings: list[str], request_id: str) -> int:
     """
     Persist a batch of video IDs for a given hashtag.
 
@@ -70,18 +74,20 @@ def save_video_ids(hashtag: str, video_ids: list[str]) -> int:
 
     Returns the number of newly inserted rows.
     """
-    if not video_ids:
+    if not url_strings:
         return 0
 
     from sqlalchemy.dialects.postgresql import insert as pg_insert
 
     rows = [
-        {"hashtag": hashtag, "video_id": vid}
-        for vid in video_ids
+        {"hashtag": hashtag, 
+         "video_url": url,
+         "request_id": request_id
+         }for url in url_strings
     ]
 
     with SessionLocal() as session:
-        stmt = pg_insert(ScrapedVideo).values(rows).on_conflict_do_nothing()
+        stmt = pg_insert(TiktokHashTagListingVideo).values(rows).on_conflict_do_nothing()
         result = session.execute(stmt)
         session.commit()
         inserted = result.rowcount

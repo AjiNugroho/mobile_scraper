@@ -90,13 +90,13 @@ def setup_db(sender, **kwargs):
     max_retries=None,       # unlimited retries for "device busy" back-off only
     default_retry_delay=10, # seconds to wait before re-queuing when all devices busy
 )
-def scrape_hashtag(self, hashtag: str) -> None:
+def scrape_hashtag(self, hashtag: str, request_id: str) -> None:
     """
     Celery task: scrape TikTok for *hashtag* and persist results.
 
     Message payload::
 
-        {"hashtag": "#wardah"}
+        {"hashtag": "#wardah", "request_id": "some-uuid"}
 
     Failure policy
     --------------
@@ -115,7 +115,7 @@ def scrape_hashtag(self, hashtag: str) -> None:
     # ── 2. Lock the device and run the scrape ─────────────────────────────────
     try:
         with acquire_device(serial):
-            video_ids = run_scrape(serial, hashtag)
+            video_urls = run_scrape(serial, hashtag)
 
     except DeviceDisconnectedError as exc:
         # Device vanished mid-task — log and stop permanently
@@ -135,14 +135,14 @@ def scrape_hashtag(self, hashtag: str) -> None:
         raise Ignore() from exc
 
     # ── 3. Persist results ────────────────────────────────────────────────────
-    if video_ids:
-        inserted = models.save_video_ids(hashtag, video_ids)
+    if video_urls:
+        inserted = models.save_video_ids(hashtag, video_urls, request_id)
         logger.info(
-            "Persisted %d new video IDs for hashtag=%r",
+            "Persisted %d new video URLs for hashtag=%r",
             inserted, hashtag,
         )
     else:
-        logger.warning("No video IDs collected for hashtag=%r", hashtag)
+        logger.warning("No video URLs collected for hashtag=%r", hashtag)
 
     logger.info("Task complete — hashtag=%r", hashtag)
 
