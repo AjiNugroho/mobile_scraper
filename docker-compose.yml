@@ -41,6 +41,7 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       CELERY_CONCURRENCY: ${CELERY_CONCURRENCY:-1}
+      CELERY_WORKER_NAME: ${CELERY_WORKER_NAME:-mobilescraper}
       # Tell adb client inside the container to use the host's adb server
       ANDROID_ADB_SERVER_HOST: host.docker.internal
       ANDROID_ADB_SERVER_PORT: "5037"

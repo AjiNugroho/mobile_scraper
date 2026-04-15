@@ -37,4 +37,5 @@ ENV CELERY_CONCURRENCY=1
 CMD celery -A worker worker \
         --loglevel=info \
         --concurrency=${CELERY_CONCURRENCY} \
-        --pool=prefork
+        --pool=prefork \
+        --hostname=${CELERY_WORKER_NAME:-worker}@%h
