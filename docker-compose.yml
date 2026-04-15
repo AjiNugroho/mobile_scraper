@@ -51,7 +51,7 @@ services:
 
     # Keep the container running even if the worker exits (e.g. after a
     # device disconnect); restart manually after investigating the logs.
-    restart: "no"
+    restart: "unless-stopped"
 
     # Readable container name
     container_name: mobilescraper_worker
