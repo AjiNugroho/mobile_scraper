@@ -24,6 +24,7 @@ short delay (without counting against the retry limit).
 
 import logging
 import sys
+import time
 
 from celery import Celery
 from celery.exceptions import Ignore
@@ -72,6 +73,8 @@ app.conf.update(
     enable_utc=True,
     # No automatic retries — failures are terminal
     task_max_retries=0,
+    # Redeliver unacked messages if a worker process dies unexpectedly
+    task_reject_on_worker_lost=True,
 )
 
 
@@ -84,11 +87,14 @@ def setup_db(sender, **kwargs):
 
 # ── Task ──────────────────────────────────────────────────────────────────────
 
+_DEVICE_POLL_INTERVAL = 15   # seconds between availability checks
+_DEVICE_WAIT_TIMEOUT  = 600  # give up after this many seconds (10 min)
+
+
 @app.task(
     name="scrape_hashtag",
     bind=True,
-    max_retries=None,       # unlimited retries for "device busy" back-off only
-    default_retry_delay=10, # seconds to wait before re-queuing when all devices busy
+    max_retries=0,
 )
 def scrape_hashtag(self, hashtag: str, request_id: str) -> None:
     """
@@ -100,17 +106,40 @@ def scrape_hashtag(self, hashtag: str, request_id: str) -> None:
 
     Failure policy
     --------------
-    - Device busy   → re-queue after 10 s (transparent to the user)
+    - Device busy   → poll inside the task (no re-queuing) until a device
+                      becomes free or the timeout is reached
     - Device disconnected / scrape error → log + stop (no retry)
     """
     logger.info("Task received — hashtag=%r", hashtag)
 
-    # ── 1. Pick an available device ───────────────────────────────────────────
-    serial = pick_available_device()
-    if serial is None:
-        logger.warning("All devices busy — re-queuing task for hashtag=%r", hashtag)
-        # Retry without counting against max_retries (device-busy is transient)
-        raise self.retry(countdown=10, max_retries=None)
+    # ── 1. Wait for an available device (inside the task, no re-queuing) ─────
+    #
+    # Previously we called self.retry() here, which acknowledged the current
+    # message and published a new one.  With multiple workers this caused a
+    # busy-loop: the free worker would drain the entire queue in seconds,
+    # re-queuing every message, then the cycle would repeat.
+    #
+    # Holding the task with a sleep keeps the message unacked in RabbitMQ
+    # (task_acks_late=True).  The worker blocks until a device is free, so no
+    # other task slots are wasted on pointless consume-and-requeue cycles.
+    serial = None
+    waited = 0
+    while serial is None:
+        serial = pick_available_device()
+        if serial is not None:
+            break
+        if waited >= _DEVICE_WAIT_TIMEOUT:
+            logger.error(
+                "Timed out waiting for an available device after %ds — dropping hashtag=%r",
+                waited, hashtag,
+            )
+            raise Ignore()
+        logger.warning(
+            "All devices busy — will retry in %ds (waited %ds) for hashtag=%r",
+            _DEVICE_POLL_INTERVAL, waited, hashtag,
+        )
+        time.sleep(_DEVICE_POLL_INTERVAL)
+        waited += _DEVICE_POLL_INTERVAL
 
     # ── 2. Lock the device and run the scrape ─────────────────────────────────
     try:
