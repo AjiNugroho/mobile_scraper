@@ -135,6 +135,7 @@ def scrape_hashtag(self, hashtag: str, request_id: str) -> None:
         raise Ignore() from exc
 
     # ── 3. Persist results ────────────────────────────────────────────────────
+    inserted = 0
     if video_urls:
         inserted = models.save_video_ids(hashtag, video_urls, request_id)
         logger.info(
@@ -144,7 +145,17 @@ def scrape_hashtag(self, hashtag: str, request_id: str) -> None:
     else:
         logger.warning("No video URLs collected for hashtag=%r", hashtag)
 
-    logger.info("Task complete — hashtag=%r", hashtag)
+    result = {
+        "status": "success",
+        "hashtag": hashtag,
+        "request_id": request_id,
+        "worker": self.request.hostname,
+        "device": serial,
+        "videos_found": len(video_urls),
+        "videos_inserted": inserted,
+    }
+    logger.info("Task complete — %s", result)
+    return result
 
 
 # ── CLI helper: enqueue tasks from a list ─────────────────────────────────────

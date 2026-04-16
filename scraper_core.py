@@ -53,6 +53,46 @@ def connect_device(serial: str) -> u2.Device:
     return d
 
 
+# ── TikTok app launch ────────────────────────────────────────────────────────
+
+_TIKTOK_CANDIDATES = [
+    "com.ss.android.ugc.trill",   # try this first (Asian market build)
+    "com.zhiliaoapp.musically",   # fallback (global build)
+]
+
+
+def launch_tiktok(d: u2.Device) -> None:
+    """Force-stop then relaunch TikTok, auto-detecting the installed package.
+
+    Tries ``com.ss.android.ugc.trill`` first, falls back to
+    ``com.zhiliaoapp.musically``.  Also updates ``config.TIKTOK_PKG`` so all
+    subsequent resource-ID selectors use the correct package name.
+    """
+    pkg = next(
+        (p for p in _TIKTOK_CANDIDATES if d.app_info(p) is not None),
+        None,
+    )
+    if pkg is None:
+        raise RuntimeError(
+            f"TikTok not found on this device. Tried: {_TIKTOK_CANDIDATES}"
+        )
+    if pkg != config.TIKTOK_PKG:
+        logger.info("Switching package from %r to %r.", config.TIKTOK_PKG, pkg)
+        config.TIKTOK_PKG = pkg
+
+    logger.info("Launching TikTok (%s) …", config.TIKTOK_PKG)
+    d.app_start(config.TIKTOK_PKG, stop=True, wait=True)
+    time.sleep(3)  # wait for the home feed to finish loading
+    logger.info("TikTok ready.")
+
+
+def close_tiktok(d: u2.Device) -> None:
+    """Force-stop TikTok after a scrape to free device resources."""
+    logger.info("Closing TikTok (%s) …", config.TIKTOK_PKG)
+    d.app_stop(config.TIKTOK_PKG)
+    logger.info("TikTok closed.")
+
+
 # ── TikTok navigation ─────────────────────────────────────────────────────────
 
 def open_search(d: u2.Device) -> None:
@@ -222,6 +262,7 @@ def run_scrape(serial: str, hashtag: str) -> list[str]:
     logger.info("[%s] Starting scrape for hashtag=%r", serial, hashtag)
     d = connect_device(serial)
 
+    launch_tiktok(d)
     open_search(d)
     type_keyword(d, hashtag)
     time.sleep(2)
@@ -230,6 +271,10 @@ def run_scrape(serial: str, hashtag: str) -> list[str]:
     apply_latest_filter(d)
     time.sleep(2)
 
-    video_urls = collect_video_urls(d)
+    try:
+        video_urls = collect_video_urls(d)
+    finally:
+        close_tiktok(d)
+
     logger.info("[%s] Scrape complete — %d video URLs collected.", serial, len(video_urls))
     return video_urls
