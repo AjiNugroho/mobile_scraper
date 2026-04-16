@@ -210,6 +210,10 @@ def collect_video_urls(d: u2.Device) -> list[str]:
         logger.error("GridView not found — cannot collect videos.")
         return video_urls
 
+    if not grid.child(index=0).exists:
+        logger.warning("GridView exists but has no videos (empty results).")
+        return video_urls
+
     grid.child(index=0).click()
     time.sleep(2)
 

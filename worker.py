@@ -147,13 +147,11 @@ def scrape_hashtag(self, hashtag: str, request_id: str) -> None:
             video_urls = run_scrape(serial, hashtag)
 
     except DeviceDisconnectedError as exc:
-        # Device vanished mid-task — log and stop permanently
         logger.error(
             "Device %s disconnected during scrape for hashtag=%r: %s",
             serial, hashtag, exc,
         )
-        # Raise Ignore so Celery marks the task as failed without retrying
-        raise Ignore() from exc
+        raise
 
     except Exception as exc:
         logger.error(
@@ -161,7 +159,7 @@ def scrape_hashtag(self, hashtag: str, request_id: str) -> None:
             hashtag, serial, exc,
             exc_info=True,
         )
-        raise Ignore() from exc
+        raise
 
     # ── 3. Persist results ────────────────────────────────────────────────────
     inserted = 0
