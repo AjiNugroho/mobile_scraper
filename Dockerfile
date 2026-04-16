@@ -38,4 +38,5 @@ CMD celery -A worker worker \
         --loglevel=info \
         --concurrency=${CELERY_CONCURRENCY} \
         --pool=prefork \
-        --hostname=${CELERY_WORKER_NAME:-worker}@%h
+        --hostname=${CELERY_WORKER_NAME:-worker}@%h \
+        --events

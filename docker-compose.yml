@@ -62,5 +62,27 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      celery -A worker flower
+        --port=5555
+        --persistent=True
+        --db=/data/flower.db
+        --max_tasks=10000
+    env_file:
+      - .env
+    ports:
+      - "5555:5555"
+    volumes:
+      - flower_data:/data
+    depends_on:
+      - worker
+    restart: "unless-stopped"
+    container_name: mobilescraper_flower
+
 volumes:
   mobilescraper_locks:
+  flower_data:
