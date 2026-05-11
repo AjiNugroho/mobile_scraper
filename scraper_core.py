@@ -150,12 +150,12 @@ def apply_latest_filter(d):
     if not safe_click(d, descriptionContains="Filter"):
         return
 
-    if not safe_click(
-        d,
-        resourceId="com.ss.android.ugc.trill:id/eeq",
-        text="Date posted"
-    ):
-        return
+    # if not safe_click(
+    #     d,
+    #     resourceId="com.ss.android.ugc.trill:id/eeq",
+    #     text="Date posted"
+    # ):
+    #     return
     
     if not safe_click(
         d,
